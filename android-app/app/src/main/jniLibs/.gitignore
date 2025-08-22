@@ -1,0 +1,4 @@
+# Ignore built shared libraries and architecture folders
+*
+!.gitignore
+

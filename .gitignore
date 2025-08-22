@@ -1,0 +1,54 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Gradle
+**/.gradle/
+**/build/
+**/captures/
+local.properties
+
+# Android Studio
+**/.cxx/
+**/.externalNativeBuild/
+
+# Kotlin/Java
+*.log
+
+# Rust
+/target/
+**/target/
+Cargo.lock
+
+# Android packages
+**/*.apk
+**/*.aab
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Android app generated
+android-app/app/release/
+android-app/app/debug/
+
+# JNI libs (built artifacts)
+android-app/app/src/main/jniLibs/**/librustdepth.so
+
+# Models and large assets
+android-app/app/src/main/assets/*.onnx
+models/
+
+# Node/yarn if ever used
+node_modules/
+
+# Misc
+*.keystore
+*.jks
+*.bak

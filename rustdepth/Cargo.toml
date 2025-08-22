@@ -1,0 +1,17 @@
+[package]
+name = "rustdepth"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = "0.21"
+bytemuck = "1"
+ndarray = "0.15"
+# For image ops (optional but handy)
+image = "0.25"
+# Only if you do Track B:
+# ort = { version = "2", default-features = false, features = ["load-dynamic","ndarray"] }
+

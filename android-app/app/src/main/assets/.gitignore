@@ -1,0 +1,4 @@
+# Ignore all assets by default (models are large)
+*
+!.gitignore
+
