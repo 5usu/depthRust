@@ -2,6 +2,9 @@
 
 Real-time, on-device monocular depth on Android powered by a Rust NDK library and ONNX Runtime.
 
+## Demo
+- Video: https://cdn.discordapp.com/attachments/1194007460629987479/1408479044328095765/screen-20250822-212118.mp4?ex=68a9e3d4&is=68a89254&hm=db26175747d2be5c6951ca97ec43b159740ad2c162e8315aa00a1334177ef52b&
+
 ## Overview
 - Android app (Kotlin, CameraX) streams camera frames
 - Rust `cdylib` (`librustdepth.so`) handles fast YUV→RGBA and buffer reuse
