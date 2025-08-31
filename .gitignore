@@ -34,6 +34,25 @@ Cargo.lock
 .env.*
 *.env
 
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.hypothesis/
+.python-version
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
 # Android app generated
 android-app/app/release/
 android-app/app/debug/
@@ -44,6 +63,23 @@ android-app/app/src/main/jniLibs/**/librustdepth.so
 # Models and large assets
 android-app/app/src/main/assets/*.onnx
 models/
+
+# ML/Weights and large artifacts
+weights/
+*.pt
+*.ptl
+*.pth
+*.ckpt
+*.onnx
+*.tflite
+*.pb
+*.h5
+*.npz
+*.pkl
+*.joblib
+
+# Misc caches
+.cache/
 
 # Node/yarn if ever used
 node_modules/

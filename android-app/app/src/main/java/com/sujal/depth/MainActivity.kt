@@ -69,7 +69,7 @@ class MainActivity : ComponentActivity() {
             if (!isChecked) return@addOnButtonCheckedListener
             useDepth = (checkedId == R.id.btnDepth)
             if (useDepth && depthSession?.isReady() != true) {
-                Toast.makeText(this, "Depth model missing. Add assets/depth_anything_small.onnx", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Depth model missing. Add assets/depth_kornia.torchscript.ptl", Toast.LENGTH_SHORT).show()
                 // revert to Rust
                 modeToggle.check(R.id.btnRust)
                 useDepth = false
@@ -118,12 +118,17 @@ class MainActivity : ComponentActivity() {
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
 
-            val preview = Preview.Builder().build().also {
+            val rotation = previewView.display.rotation
+
+            val preview = Preview.Builder()
+                .setTargetRotation(rotation)
+                .build().also {
                 it.setSurfaceProvider(previewView.surfaceProvider)
             }
 
             val analyzer = ImageAnalysis.Builder()
-                .setTargetResolution(android.util.Size(640, 480))
+                .setTargetResolution(android.util.Size(480, 360))
+                .setTargetRotation(rotation)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                 .build()
@@ -132,6 +137,7 @@ class MainActivity : ComponentActivity() {
                         onBitmap = { bitmap -> rustImageView.post { rustImageView.setImageBitmap(bitmap) } },
                         onFps = { f -> fpsText.post { fpsText.text = String.format("%.1f FPS", f) } },
                         onStats = { min, max, ms -> statsText.post { statsText.text = String.format("min=%.3f max=%.3f inf=%dms", min, max, ms) } },
+                        onRotation = { deg -> rustImageView.post { rustImageView.rotation = deg } },
                         useDepth = { useDepth },
                         useColor = { useColor },
                         depthInfer = { rgba, w, h ->
@@ -165,6 +171,7 @@ private class FrameAnalyzer(
     private val onBitmap: (Bitmap) -> Unit,
     private val onFps: (Float) -> Unit,
     private val onStats: (Float, Float, Long) -> Unit,
+    private val onRotation: (Float) -> Unit,
     private val useDepth: () -> Boolean,
     private val useColor: () -> Boolean,
     private val depthInfer: (ByteArray, Int, Int) -> ByteArray,
@@ -183,6 +190,10 @@ private class FrameAnalyzer(
 
     override fun analyze(imageProxy: ImageProxy) {
         val img = imageProxy.image ?: run { imageProxy.close(); return }
+
+        // Apply current frame rotation to the overlay view
+        val deg = imageProxy.imageInfo.rotationDegrees.toFloat()
+        onRotation(deg)
 
         val now = System.currentTimeMillis()
         if (now - lastTs < 33) { imageProxy.close(); return }

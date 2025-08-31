@@ -55,5 +55,6 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("com.google.android.material:material:1.12.0")
 
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.18.0")
+    // Switch to full PyTorch (1.13.1) for wider op support
+    implementation("org.pytorch:pytorch_android:1.13.1")
 }

@@ -28,9 +28,10 @@ fn yuv420_to_rgb(y: &[u8], u: &[u8], v: &[u8], w: usize, h: usize, stride_y: usi
             let c = yv - 16;
             let d = u8v - 128;
             let e = v8v - 128;
-            let mut r = (298*c + 409*e + 128) >> 8;
-            let mut g = (298*c - 100*d - 208*e + 128) >> 8;
-            let mut b = (298*c + 516*d + 128) >> 8;
+            // Use fixed-point coeffs closer to ITU-R BT.601 full range
+            let mut r = (256*c + 359*e + 128) >> 8;
+            let mut g = (256*c -  88*d - 183*e + 128) >> 8;
+            let mut b = (256*c + 454*d + 128) >> 8;
             r = r.clamp(0,255); g = g.clamp(0,255); b = b.clamp(0,255);
             let o = (j*w + i)*3;
             out_rgb[o] = r as u8; out_rgb[o+1] = g as u8; out_rgb[o+2] = b as u8;

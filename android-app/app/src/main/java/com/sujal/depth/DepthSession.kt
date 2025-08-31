@@ -1,49 +1,39 @@
 package com.sujal.depth
 
 import android.content.Context
-import java.nio.FloatBuffer
-import ai.onnxruntime.OnnxTensor
-import ai.onnxruntime.OrtEnvironment
-import ai.onnxruntime.OrtSession
-import kotlin.math.max
-import kotlin.math.min
+import android.util.Log
+import org.pytorch.IValue
+import org.pytorch.Module
+import org.pytorch.Tensor
 
 class DepthSession(
-    context: Context,
-    private val modelAssetName: String = "depth_anything_small.onnx",
-    private val inputWidth: Int = 256,
-    private val inputHeight: Int = 256
+    private val context: Context,
+    private val modelAssetName: String = "depth_kornia.torchscript.ptl",
+    private val inputWidth: Int = 224,
+    private val inputHeight: Int = 224
 ) {
-    private var env: OrtEnvironment? = null
-    private var session: OrtSession? = null
-    private var inputName: String? = null
-    private var outputName: String? = null
+    private var module: Module? = null
 
     var lastMin: Float = 0f; private set
     var lastMax: Float = 0f; private set
     var lastMs: Long = 0; private set
+    private var emaMin: Float = Float.NaN
+    private var emaMax: Float = Float.NaN
+    private val emaAlpha: Float = 0.1f
 
     init {
         try {
-            val bytes = context.assets.open(modelAssetName).use { it.readBytes() }
-            val e = OrtEnvironment.getEnvironment()
-            val opts = OrtSession.SessionOptions().apply {
-                try { addNnapi() } catch (_: Throwable) {}
-                setIntraOpNumThreads(1)
-                setInterOpNumThreads(1)
-            }
-            val s = e.createSession(bytes, opts)
-            session = s
-            env = e
-            inputName = s.inputNames.firstOrNull()
-            outputName = s.outputNames.firstOrNull()
-        } catch (_: Throwable) {
-            env = null
-            session = null
+            val path = assetFilePath(context, modelAssetName)
+            Log.d("DepthSession", "Loading model from $path")
+            module = Module.load(path)
+            Log.d("DepthSession", "Model loaded OK")
+        } catch (t: Throwable) {
+            Log.e("DepthSession", "Failed to load model: ${t.message}", t)
+            module = null
         }
     }
 
-    fun isReady(): Boolean = env != null && session != null && inputName != null && outputName != null
+    fun isReady(): Boolean = module != null
 
     fun inferDepthRgba(
         rgba: ByteArray,
@@ -51,30 +41,26 @@ class DepthSession(
         height: Int,
         colorize: Boolean = false
     ): ByteArray {
-        val s = session ?: return rgba
-        val e = env ?: return rgba
-        val inName = inputName ?: return rgba
-        val outName = outputName ?: return rgba
-
+        val m = module ?: return rgba
         val start = System.nanoTime()
+        // Convert RGBA ByteArray -> Float32 NCHW (1,3,H,W) and normalize [0,1]
         val chw = FloatArray(3 * inputWidth * inputHeight)
         downscaleRgbaToChw(rgba, width, height, chw, inputWidth, inputHeight)
-        val fb = FloatBuffer.wrap(chw)
-        val inputTensor = OnnxTensor.createTensor(e, fb, longArrayOf(1, 3, inputHeight.toLong(), inputWidth.toLong()))
-        val output: FloatArray
-        s.run(mapOf(inName to inputTensor)).use { results ->
-            val value = results[0] as OnnxTensor
-            val ob = value.floatBuffer
-            output = FloatArray(ob.remaining())
-            ob.get(output)
-        }
+        val input = Tensor.fromBlob(chw, longArrayOf(1, 3, inputHeight.toLong(), inputWidth.toLong()))
+        val out = m.forward(IValue.from(input)).toTensor()
+        val output = out.dataAsFloatArray
         lastMs = (System.nanoTime() - start) / 1_000_000
 
         var vmin = Float.POSITIVE_INFINITY
         var vmax = Float.NEGATIVE_INFINITY
         for (v in output) { if (v < vmin) vmin = v; if (v > vmax) vmax = v }
-        lastMin = vmin; lastMax = vmax
-        val range = if (vmax > vmin) (vmax - vmin) else 1f
+        // Smooth to stabilize visualization
+        if (emaMin.isNaN()) { emaMin = vmin; emaMax = vmax } else {
+            emaMin = emaMin + emaAlpha * (vmin - emaMin)
+            emaMax = emaMax + emaAlpha * (vmax - emaMax)
+        }
+        lastMin = emaMin; lastMax = emaMax
+        val range = (emaMax - emaMin).coerceAtLeast(1e-6f)
         val ow = guessOutWidth(output)
         val oh = output.size / ow
 
@@ -84,7 +70,7 @@ class DepthSession(
             for (x in 0 until width) {
                 val sx = (x * ow) / width
                 val d = output[sy * ow + sx]
-                val n = ((d - vmin) / range).coerceIn(0f, 1f)
+                val n = ((d - emaMin) / range).coerceIn(0f, 1f)
                 val idx = (y * width + x) * 4
                 if (colorize) {
                     val c = turboColor(n)
@@ -140,4 +126,22 @@ class DepthSession(
             (b.coerceIn(0.0,1.0)*255.0).toInt().toByte(),
         )
     }
+}
+
+private fun assetFilePath(context: Context, assetName: String): String {
+    val file = java.io.File(context.filesDir, assetName)
+    if (file.exists() && file.length() > 0) return file.absolutePath
+    android.util.Log.d("DepthSession", "Copying asset $assetName to ${file.absolutePath}")
+    context.assets.open(assetName).use { input ->
+        java.io.FileOutputStream(file).use { output ->
+            val buffer = ByteArray(4 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                output.write(buffer, 0, read)
+            }
+            output.flush()
+        }
+    }
+    return file.absolutePath
 }
